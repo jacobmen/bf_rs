@@ -84,6 +84,68 @@ impl Interpreter {
         }
     }
 
+    /// Runs interpreter on program until termination or forever if it doesn't halt
+    pub fn run(&mut self) {
+        while !self.terminated {
+            self.step();
+        }
+    }
+
+    fn step(&mut self) {
+        let instruction = &self.instructions[self.instr_ptr];
+
+        match instruction {
+            Instruction::IncrementDP => self.data_ptr += 1,
+            Instruction::DecrementDP => self.data_ptr -= 1,
+            Instruction::IncrementByte => self.data[self.data_ptr] += 1,
+            Instruction::DecrementByte => self.data[self.data_ptr] -= 1,
+            Instruction::OutputByte => {
+                if let Ok(s) = str::from_utf8(&[self.data[self.data_ptr] as u8]) {
+                    print!("{}", s);
+                } else {
+                    println!(
+                        "[ERROR] Couldn't convert byte at index {} to UTF-8",
+                        self.data_ptr
+                    );
+                }
+            }
+            Instruction::ReadByte => {
+                let input: Option<i8> = std::io::stdin()
+                    .bytes()
+                    .next()
+                    .and_then(|result| result.ok())
+                    .map(|byte| byte as i8);
+
+                if let Some(byte) = input {
+                    self.data[self.data_ptr] = byte;
+                } else {
+                    eprintln!("[ERROR] Failed to read byte from stdin");
+                    return;
+                }
+            }
+            Instruction::ConditionalOpen(close_index) => {
+                if self.data[self.data_ptr] == 0 {
+                    self.instr_ptr = close_index + 1;
+                } else {
+                    self.instr_ptr += 1;
+                }
+            }
+            Instruction::ConditionalClose(open_index) => {
+                if self.data[self.data_ptr] != 0 {
+                    self.instr_ptr = open_index + 1;
+                } else {
+                    self.instr_ptr += 1;
+                }
+            }
+            Instruction::Ignore => {}
+        }
+
+        if !instruction.is_conditional_open() && !instruction.is_conditional_close() {
+            self.instr_ptr += 1
+        }
+
+        if self.instr_ptr == self.instructions.len() {
+            self.terminated = true;
         }
     }
 }
