@@ -1,4 +1,5 @@
 mod bf;
+mod bf_error;
 
 use bf::Interpreter;
 use std::env;
@@ -17,6 +18,12 @@ fn main() {
         exit(1);
     });
 
-    let mut interpreter = Interpreter::new(&file_content);
-    interpreter.run();
+    let mut interpreter = Interpreter::new(&file_content).unwrap_or_else(|err| {
+        eprintln!("[ERROR] {}", err.details());
+        exit(1);
+    });
+    interpreter.run().unwrap_or_else(|err| {
+        eprintln!("[ERROR] {}", err.details());
+        exit(1);
+    });
 }

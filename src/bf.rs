@@ -1,3 +1,4 @@
+use crate::bf_error::BfError;
 use std::io::Read;
 use std::str;
 
@@ -43,8 +44,7 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    // TODO: Return Result after implementing checks for matching parenthesis
-    pub fn new(program: &str) -> Self {
+    pub fn new(program: &str) -> Result<Self, BfError> {
         let mut instructions = Vec::with_capacity(program.len());
         let mut matching_pair_indices = Vec::new();
 
@@ -73,25 +73,29 @@ impl Interpreter {
             }
         }
 
-        assert!(matching_pair_indices.is_empty());
+        if !matching_pair_indices.is_empty() {
+            return Err(BfError::new("Number of matching parenthesis don't match"));
+        }
 
-        Self {
+        Ok(Self {
             instructions,
             data: [0; DATA_SIZE],
             instr_ptr: 0,
             data_ptr: 0,
             terminated: false,
-        }
+        })
     }
 
     /// Runs interpreter on program until termination or forever if it doesn't halt
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<(), BfError> {
         while !self.terminated {
-            self.step();
+            self.step()?;
         }
+
+        Ok(())
     }
 
-    fn step(&mut self) {
+    fn step(&mut self) -> Result<(), BfError> {
         let instruction = &self.instructions[self.instr_ptr];
 
         match instruction {
@@ -103,10 +107,10 @@ impl Interpreter {
                 if let Ok(s) = str::from_utf8(&[self.data[self.data_ptr] as u8]) {
                     print!("{}", s);
                 } else {
-                    println!(
+                    return Err(BfError::new(&format!(
                         "[ERROR] Couldn't convert byte at index {} to UTF-8",
                         self.data_ptr
-                    );
+                    )));
                 }
             }
             Instruction::ReadByte => {
@@ -119,8 +123,7 @@ impl Interpreter {
                 if let Some(byte) = input {
                     self.data[self.data_ptr] = byte;
                 } else {
-                    eprintln!("[ERROR] Failed to read byte from stdin");
-                    return;
+                    return Err(BfError::new("[ERROR] Failed to read byte from stdin"));
                 }
             }
             Instruction::ConditionalOpen(close_index) => {
@@ -147,5 +150,7 @@ impl Interpreter {
         if self.instr_ptr == self.instructions.len() {
             self.terminated = true;
         }
+
+        Ok(())
     }
 }
